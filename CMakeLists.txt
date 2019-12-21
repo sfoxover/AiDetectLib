@@ -22,6 +22,3 @@ target_link_libraries(${AI_LIB_NAME} MessagesLib dlib::dlib)
 install(TARGETS ${AI_LIB_NAME} DESTINATION lib)
 install(FILES ${LIB_HEADERS} DESTINATION include)
 
-# message("COPY --- from: ${PROJECT_SOURCE_DIR}/${AI_LIB_NAME}/include/haarcascade_frontalface_default.xml to  ${CMAKE_BINARY_DIR}/bin/haarcascade_frontalface_default.xml")
-# configure_file("${PROJECT_SOURCE_DIR}/${AI_LIB_NAME}/include/haarcascade_frontalface_default.xml" "${CMAKE_BINARY_DIR}/bin/haarcascade_frontalface_default.xml" COPYONLY)
-# configure_file("${PROJECT_SOURCE_DIR}/${AI_LIB_NAME}/include/haarcascade_profileface.xml" "${CMAKE_BINARY_DIR}/bin/haarcascade_profileface.xml" COPYONLY)

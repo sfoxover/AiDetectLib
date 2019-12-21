@@ -48,20 +48,20 @@ void CDetectFaces::Initialize(std::string method)
 
 void CDetectFaces::InitOpenCV()
 {
-	auto filePath = Helpers::AppendToRunPath("haarcascade_frontalface_default.xml");
+	auto filePath = Helpers::AppendToRunPath(Helpers::AppendPath("assets", "haarcascade_frontalface_default.xml"));
 	bool bOK = _faceFront.load(filePath);
 	assert(bOK);
-	filePath = Helpers::AppendToRunPath("haarcascade_profileface.xml");
+	filePath = Helpers::AppendToRunPath(Helpers::AppendPath("assets", "haarcascade_profileface.xml"));
 	bOK = _faceProfile.load(filePath);
 	assert(bOK);
 }
 
 void CDetectFaces::InitDNN()
 {
-	auto caffeConfigFile = Helpers::AppendToRunPath("deploy.prototxt");
-	auto caffeWeightFile = Helpers::AppendToRunPath("res10_300x300_ssd_iter_140000_fp16.caffemodel");
-	auto tensorflowConfigFile = Helpers::AppendToRunPath("opencv_face_detector.pbtxt");
-	auto tensorflowWeightFile = Helpers::AppendToRunPath("opencv_face_detector_uint8.pb");
+	auto caffeConfigFile = Helpers::AppendToRunPath(Helpers::AppendPath("assets", "deploy.prototxt"));
+	auto caffeWeightFile = Helpers::AppendToRunPath(Helpers::AppendPath("assets", "res10_300x300_ssd_iter_140000_fp16.caffemodel"));
+	auto tensorflowConfigFile = Helpers::AppendToRunPath(Helpers::AppendPath("assets", "opencv_face_detector.pbtxt"));
+	auto tensorflowWeightFile = Helpers::AppendToRunPath(Helpers::AppendPath("assets", "opencv_face_detector_uint8.pb"));
 #ifdef CAFFE
 	_networkFace = cv::dnn::readNetFromCaffe(caffeConfigFile, caffeWeightFile);
 #else
@@ -76,7 +76,7 @@ void CDetectFaces::InitHog()
 
 void CDetectFaces::InitMod()
 {
-	std::string mmodModelPath = Helpers::AppendToRunPath("mmod_human_face_detector.dat");
+	std::string mmodModelPath = Helpers::AppendToRunPath(Helpers::AppendPath("assets", "mmod_human_face_detector.dat"));
 	dlib::deserialize(mmodModelPath) >> _mmodFaceDetector;
 }
 
