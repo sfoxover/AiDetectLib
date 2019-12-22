@@ -10,7 +10,7 @@ file(GLOB_RECURSE LIB_SOURCES "src/*.cpp")
 file(GLOB_RECURSE LIB_HEADERS "src/*.h include/*.hpp")
 
 # The variable 'dlib_INCLUDE_DIRS' is deprecated
-include_directories(include ${OpenCV_INCLUDE_DIRS} ${dlib_INCLUDE_DIRS})
+include_directories(include ${OpenCV_INCLUDE_DIRS})
 
 # Add source to this project's executable.
 add_library(${AI_LIB_NAME} STATIC ${LIB_SOURCES} ${LIB_HEADERS})
