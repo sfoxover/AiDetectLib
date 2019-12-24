@@ -13,7 +13,7 @@
 
 CDetectFaces::CDetectFaces()
 {
-	_detectMethod = none;
+	SetDetectMethod(none);
 }
 
 CDetectFaces::~CDetectFaces()
@@ -26,28 +26,28 @@ bool CDetectFaces::Initialize(std::string method, std::wstring& error)
 	// Supported methods are OpenCV, Dnn, Hog, Mod
 	if (method == "OpenCV")
 	{
-		_detectMethod = OpenCV;
 		InitOpenCV();
+		SetDetectMethod(OpenCV);
 	}
 	else if (method == "Dnn")
 	{
-		_detectMethod = Dnn;
 		InitDNN();
+		SetDetectMethod(Dnn);
 	}
 	else if (method == "Hog")
 	{
-		_detectMethod = Hog;
 		InitHog();
+		SetDetectMethod(Hog);
 	}
 	else if (method == "Mod")
 	{
-		_detectMethod = Mod;
 		InitMod();
+		SetDetectMethod(Mod);
 	}
 	else if (method == "Off")
 	{
-		_detectMethod = none;
 		InitMod();
+		SetDetectMethod(none);
 	}
 	else
 	{
@@ -59,11 +59,28 @@ bool CDetectFaces::Initialize(std::string method, std::wstring& error)
 	return true;
 }
 
+// Get set for _detectMethod
+void CDetectFaces::GetDetectMethod(DetectMethods& value)
+{
+	_detectMethodLock.lock();
+	value = _detectMethod;
+	_detectMethodLock.unlock();
+}
+
+void CDetectFaces::SetDetectMethod(DetectMethods value)
+{
+	_detectMethodLock.lock();
+	_detectMethod = value;
+	_detectMethodLock.unlock();
+}
+
 // Return face detect AI method as string
 std::string CDetectFaces::GetDetectMethod()
 {
 	std::string result = "Unknown";
-	switch (_detectMethod)
+	DetectMethods method;
+	GetDetectMethod(method);
+	switch (method)
 	{
 	case OpenCV:
 		result = "OpenCV";
@@ -125,7 +142,9 @@ void CDetectFaces::DetectFaces(cv::Mat image, bool addRectToFace)
 {
 	std::wstring error;
 	bool bOK = true;
-	switch (_detectMethod)
+	DetectMethods method;
+	GetDetectMethod(method);
+	switch (method)
 	{
 	case OpenCV:
 		bOK = DetectFaceOpenCV(image, addRectToFace, error);

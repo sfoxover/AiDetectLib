@@ -3,11 +3,9 @@
 	Scan a frame with OpenCV for faces and detection
 */
 #include <opencv2/opencv.hpp>
-
 #include <dlib/opencv.h>
 #include <dlib/image_processing.h>
 #include <dlib/image_processing/frontal_face_detector.h>
-
 #include <dlib/dnn.h>
 #include <dlib/data_io.h>
 
@@ -34,6 +32,7 @@ private:
 
 private:
 // Properties
+
 	// Detect faces
 	cv::dnn::Net _networkFace;
 	cv::CascadeClassifier _faceFront;
@@ -46,13 +45,18 @@ private:
 	{
 		none, OpenCV, Dnn, Hog, Mod
 	};
+
+	// Current selected AI method
 	DetectMethods _detectMethod;
+	std::mutex _detectMethodLock;
 
 // Methods
+
 	// Look for a face in image
 	bool DetectFaceOpenCV(cv::Mat image, bool addRectToFace, std::wstring& error);
 	bool DetectFaceDNN(cv::Mat image, bool addRectToFace, std::wstring& error);
 	bool DetectFaceDlibHog(cv::Mat image, bool addRectToFace, std::wstring &error);
+	
 	// Can be hardware accelerated, fastest on Pi4
 	bool DetectFaceDlibMod(cv::Mat image, bool addRectToFace, std::wstring &error);	
 
@@ -63,6 +67,10 @@ public:
 		static CDetectFaces instance;
 		return instance;
 	}
+
+	// Get set for _detectMethod
+	void GetDetectMethod(DetectMethods& value);
+	void SetDetectMethod(DetectMethods value);
 
 	// Return face detect AI method as string
 	std::string GetDetectMethod();
