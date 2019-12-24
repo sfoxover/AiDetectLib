@@ -64,8 +64,11 @@ public:
 		return instance;
 	}
 
+	// Return face detect AI method as string
+	std::string GetDetectMethod();
+
 	// Set initial settings
-	void Initialize(std::string method);
+	bool Initialize(std::string method, std::wstring& error);
 
 	// Look for a face in image
 	void DetectFaces(cv::Mat image, bool addRectToFace);

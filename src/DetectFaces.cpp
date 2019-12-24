@@ -21,7 +21,7 @@ CDetectFaces::~CDetectFaces()
 }
 
 // Set initial settings
-void CDetectFaces::Initialize(std::string method)
+bool CDetectFaces::Initialize(std::string method, std::wstring& error)
 {
 	// Supported methods are OpenCV, Dnn, Hog, Mod
 	if (method == "OpenCV")
@@ -44,6 +44,47 @@ void CDetectFaces::Initialize(std::string method)
 		_detectMethod = Mod;
 		InitMod();
 	}
+	else if (method == "Off")
+	{
+		_detectMethod = none;
+		InitMod();
+	}
+	else
+	{
+		std::wstringstream szErr;
+		szErr << L"Error, DetectFaces method is unsupported. Method = " << Helpers::Utf8ToWide(method) << ".";
+		error = szErr.str();
+		return false;
+	}
+	return true;
+}
+
+// Return face detect AI method as string
+std::string CDetectFaces::GetDetectMethod()
+{
+	std::string result = "Unknown";
+	switch (_detectMethod)
+	{
+	case OpenCV:
+		result = "OpenCV";
+		break;
+	case Dnn:
+		result = "Dnn";
+		break;
+	case Hog:
+		result = "Hog";
+		break;
+	case Mod:
+		result = "Mod";
+		break;
+	case none:
+		result = "Off";
+		break;
+	default:
+		assert(false);
+		break;
+	}
+	return result;
 }
 
 void CDetectFaces::InitOpenCV()
