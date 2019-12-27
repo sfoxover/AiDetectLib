@@ -3,9 +3,9 @@
 #include "DetectFaces.h"
 #include <filesystem>
 #ifndef WIN32
-	#include <unistd.h>
+#include <unistd.h>
 #else
-	#include "windows.h"
+#include "windows.h"
 #endif
 #include <iostream>
 
@@ -25,7 +25,7 @@ CDetectFaces::~CDetectFaces()
 }
 
 // Set initial settings
-bool CDetectFaces::Initialize(std::string method, std::function<void(cv::Mat)> callback, std::wstring& error)
+bool CDetectFaces::Initialize(std::string method, std::function<void(cv::Mat)> callback, std::wstring &error)
 {
 	_detectedCallback = callback;
 
@@ -66,17 +66,23 @@ bool CDetectFaces::Initialize(std::string method, std::function<void(cv::Mat)> c
 	// Start thread to process images
 	if (method != "Off" && !_detectThread.joinable())
 	{
-		_detectThread = std::thread(&CDetectFaces::DetectFacesThread, this);
+		_signalNewImage = std::make_unique<std::promise<void>>();
+		auto futureObj = _signalNewImage->get_future();
+		_detectThread = std::thread(&CDetectFaces::DetectFacesThread, this, std::move(futureObj));
 	}
 
 	return true;
 }
 
 // Stop face detection thread
-bool CDetectFaces::Stop(std::wstring& error)
+bool CDetectFaces::Stop(std::wstring &error)
 {
 	SetExitingFlag(true);
-	_signalNewImage.notify_all();
+	if (_signalNewImage)
+	{
+		_signalNewImage->set_value();
+		_signalNewImage.reset(nullptr);
+	}
 
 	if (_detectThread.joinable())
 		_detectThread.join();
@@ -84,7 +90,7 @@ bool CDetectFaces::Stop(std::wstring& error)
 }
 
 // Get set for _detectMethod
-void CDetectFaces::GetDetectMethod(DetectMethods& value)
+void CDetectFaces::GetDetectMethod(DetectMethods &value)
 {
 	_detectMethodLock.lock();
 	value = _detectMethod;
@@ -99,7 +105,7 @@ void CDetectFaces::SetDetectMethod(DetectMethods value)
 }
 
 // Get set for _addRectToFace
-void CDetectFaces::GetAddRectToFace(bool& value)
+void CDetectFaces::GetAddRectToFace(bool &value)
 {
 	_addRectToFaceLock.lock();
 	value = _addRectToFace;
@@ -114,7 +120,7 @@ void CDetectFaces::SetAddRectToFace(bool value)
 }
 
 // Get set for _exitingFlag
-void CDetectFaces::GetExitingFlag(bool& value)
+void CDetectFaces::GetExitingFlag(bool &value)
 {
 	_exitingFlagLock.lock();
 	value = _exitingFlag;
@@ -206,21 +212,20 @@ bool CDetectFaces::AddImageToQueue(cv::Mat image)
 	_imageQueueLock.unlock();
 
 	// Signal new image available
-	if (signal)
+	if (signal && _signalNewImage)
 	{
-		_signalNewImage.notify_all();
+		_signalNewImage->set_value();
+		_signalNewImage.reset(nullptr);
 	}
 	return signal;
 }
 
-void CDetectFaces::DetectFacesThread(CDetectFaces* pThis)
+void CDetectFaces::DetectFacesThread(CDetectFaces *pThis, std::future<void> futureObj)
 {
 	bool exiting = false;
 	do
 	{
-		std::unique_lock<std::mutex> lock(pThis->_mutexNewImage);
-		pThis->_signalNewImage.wait(lock);
-
+		futureObj.wait();
 		bool hasImage;
 		do
 		{
@@ -235,48 +240,48 @@ void CDetectFaces::DetectFacesThread(CDetectFaces* pThis)
 				if (hasImage)
 				{
 					image = pThis->_imageQueue[0];
+					pThis->_imageQueue.erase(pThis->_imageQueue.begin());
 				}
-				pThis->_imageQueue.erase(pThis->_imageQueue.begin());
 				pThis->_imageQueueLock.unlock();
 
-				std::wstring error;
-				DetectMethods method;
-				pThis->GetDetectMethod(method);
-				bool addRectToImage;
-				pThis->GetAddRectToFace(addRectToImage);
-				bool bFoundFace = false;
-
-				switch (method)
+				if (hasImage)
 				{
-				case OpenCV:
-					bFoundFace = pThis->DetectFaceOpenCV(image, addRectToImage, error);
-					break;
-				case Dnn:
-					bFoundFace = pThis->DetectFaceDNN(image, addRectToImage, error);
-					break;
-				case Hog:
-					bFoundFace = pThis->DetectFaceDlibHog(image, addRectToImage, error);
-					break;
-				case Mod:
-					bFoundFace = pThis->DetectFaceDlibMod(image, addRectToImage, error);
-					break;
-				default:
-					std::cerr << "DetectFaces unsupported method, " << method << std::endl;
-					break;
-				}
-				if (bFoundFace)
-				{
-					pThis->_detectedCallback(image);
+					std::wstring error;
+					DetectMethods method;
+					pThis->GetDetectMethod(method);
+					bool addRectToImage;
+					pThis->GetAddRectToFace(addRectToImage);
+					bool bFoundFace = false;
+					switch (method)
+					{
+					case OpenCV:
+						bFoundFace = pThis->DetectFaceOpenCV(image, addRectToImage, error);
+						break;
+					case Dnn:
+						bFoundFace = pThis->DetectFaceDNN(image, addRectToImage, error);
+						break;
+					case Hog:
+						bFoundFace = pThis->DetectFaceDlibHog(image, addRectToImage, error);
+						break;
+					case Mod:
+						bFoundFace = pThis->DetectFaceDlibMod(image, addRectToImage, error);
+						break;
+					default:
+						std::cerr << "DetectFaces unsupported method, " << method << std::endl;
+						break;
+					}
+					if (bFoundFace)
+					{
+						pThis->_detectedCallback(image);
+					}
 				}
 			}
-		}
-		while (hasImage);
-	} 
-	while (!exiting);
+		} while (hasImage);
+	} while (!exiting);
 }
 
 // Look for a face in image
-bool CDetectFaces::DetectFaceOpenCV(cv::Mat& image, bool addRectToFace, std::wstring &error)
+bool CDetectFaces::DetectFaceOpenCV(cv::Mat &image, bool addRectToFace, std::wstring &error)
 {
 	bool bFoundFace = false;
 	if (!_faceFront.empty())
@@ -302,7 +307,7 @@ bool CDetectFaces::DetectFaceOpenCV(cv::Mat& image, bool addRectToFace, std::wst
 }
 
 // Look for a face in image
-bool CDetectFaces::DetectFaceDNN(cv::Mat& image, bool addRectToFace, std::wstring &error)
+bool CDetectFaces::DetectFaceDNN(cv::Mat &image, bool addRectToFace, std::wstring &error)
 {
 	bool bFoundFace = false;
 	const cv::Scalar meanVal(104.0, 177.0, 123.0);
@@ -337,7 +342,7 @@ bool CDetectFaces::DetectFaceDNN(cv::Mat& image, bool addRectToFace, std::wstrin
 	return bFoundFace;
 }
 
-bool CDetectFaces::DetectFaceDlibHog(cv::Mat& image, bool addRectToFace, std::wstring &error)
+bool CDetectFaces::DetectFaceDlibHog(cv::Mat &image, bool addRectToFace, std::wstring &error)
 {
 	bool bFoundFace = false;
 	int inHeight = 300;
@@ -372,7 +377,7 @@ bool CDetectFaces::DetectFaceDlibHog(cv::Mat& image, bool addRectToFace, std::ws
 	return bFoundFace;
 }
 
-bool CDetectFaces::DetectFaceDlibMod(cv::Mat& image, bool addRectToFace, std::wstring &error)
+bool CDetectFaces::DetectFaceDlibMod(cv::Mat &image, bool addRectToFace, std::wstring &error)
 {
 	bool bFoundFace = false;
 	int inHeight = 300;

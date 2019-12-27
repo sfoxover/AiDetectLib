@@ -72,8 +72,7 @@ private:
 	std::function<void(cv::Mat)> _detectedCallback;
 
 	// Signal when new image is ready to be processed
-	std::mutex _mutexNewImage;
-	std::condition_variable _signalNewImage;
+	std::unique_ptr<std::promise<void>> _signalNewImage;
 
 // Methods
 
@@ -117,5 +116,5 @@ public:
 	bool AddImageToQueue(cv::Mat image);
 
 	// Look for a face in image on separate thread
-	static void DetectFacesThread(CDetectFaces* pThis);
+	static void DetectFacesThread(CDetectFaces* pThis, std::future<void> futureObj);
 };
