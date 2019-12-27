@@ -2,6 +2,10 @@
 /*
 	Scan a frame with OpenCV for faces and detection
 */
+
+#include <mutex>
+#include <condition_variable>
+
 #include <opencv2/opencv.hpp>
 #include <dlib/opencv.h>
 #include <dlib/image_processing.h>
@@ -16,7 +20,6 @@ template <typename SUBNET> using downsampler  = dlib::relu<dlib::affine<con5d<32
 template <typename SUBNET> using rcon5  = dlib::relu<dlib::affine<con5<45,SUBNET>>>;
 
 using net_type = dlib::loss_mmod<dlib::con<1,9,9,1,1,rcon5<rcon5<rcon5<downsampler<dlib::input_rgb_image_pyramid<dlib::pyramid_down<6>>>>>>>>;
-
 
 class CDetectFaces
 {
@@ -50,15 +53,36 @@ private:
 	DetectMethods _detectMethod;
 	std::mutex _detectMethodLock;
 
+	// Flag to add rectangle to image around detected face
+	bool _addRectToFace;
+	std::mutex _addRectToFaceLock;
+
+	// Queue of cv::Mat images to run detection on 
+	std::vector<cv::Mat> _imageQueue;
+	std::mutex _imageQueueLock;
+
+	// Exit thread flag
+	bool _exitingFlag;
+	std::mutex _exitingFlagLock;
+
+	// Detect face thread
+	std::thread _detectThread;
+
+	// Callback method to pass detected face images to
+	std::function<void(cv::Mat)> _detectedCallback;
+
+	// Signal when new image is ready to be processed
+	std::mutex _mutexNewImage;
+	std::condition_variable _signalNewImage;
+
 // Methods
 
 	// Look for a face in image
-	bool DetectFaceOpenCV(cv::Mat image, bool addRectToFace, std::wstring& error);
-	bool DetectFaceDNN(cv::Mat image, bool addRectToFace, std::wstring& error);
-	bool DetectFaceDlibHog(cv::Mat image, bool addRectToFace, std::wstring &error);
-	
+	bool DetectFaceOpenCV(cv::Mat& image, bool addRectToFace, std::wstring& error);
+	bool DetectFaceDNN(cv::Mat& image, bool addRectToFace, std::wstring& error);
+	bool DetectFaceDlibHog(cv::Mat& image, bool addRectToFace, std::wstring &error);
 	// Can be hardware accelerated, fastest on Pi4
-	bool DetectFaceDlibMod(cv::Mat image, bool addRectToFace, std::wstring &error);	
+	bool DetectFaceDlibMod(cv::Mat& image, bool addRectToFace, std::wstring &error);	
 
 public:
 // Methods
@@ -67,17 +91,31 @@ public:
 		static CDetectFaces instance;
 		return instance;
 	}
+	
+	// Set initial settings
+	bool Initialize(std::string method, std::function<void(cv::Mat)> callback, std::wstring& error);
+
+	// Stop face detection thread
+	bool Stop(std::wstring& error);
 
 	// Get set for _detectMethod
 	void GetDetectMethod(DetectMethods& value);
 	void SetDetectMethod(DetectMethods value);
 
+	// Get set for _addRectToFace
+	void GetAddRectToFace(bool& value);
+	void SetAddRectToFace(bool value);
+
+	// Get set for _exitingFlag
+	void GetExitingFlag(bool& value);
+	void SetExitingFlag(bool value);
+
 	// Return face detect AI method as string
 	std::string GetDetectMethod();
 
-	// Set initial settings
-	bool Initialize(std::string method, std::wstring& error);
+	// Add new image to queue
+	bool AddImageToQueue(cv::Mat image);
 
-	// Look for a face in image
-	void DetectFaces(cv::Mat image, bool addRectToFace);
+	// Look for a face in image on separate thread
+	static void DetectFacesThread(CDetectFaces* pThis);
 };
