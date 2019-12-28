@@ -13,13 +13,17 @@
 #include <dlib/dnn.h>
 #include <dlib/data_io.h>
 
-template <long num_filters, typename SUBNET> using con5d = dlib::con<num_filters,5,5,2,2,SUBNET>;
-template <long num_filters, typename SUBNET> using con5  = dlib::con<num_filters,5,5,1,1,SUBNET>;
+template <long num_filters, typename SUBNET>
+using con5d = dlib::con<num_filters, 5, 5, 2, 2, SUBNET>;
+template <long num_filters, typename SUBNET>
+using con5 = dlib::con<num_filters, 5, 5, 1, 1, SUBNET>;
 
-template <typename SUBNET> using downsampler  = dlib::relu<dlib::affine<con5d<32, dlib::relu<dlib::affine<con5d<32, dlib::relu<dlib::affine<con5d<16,SUBNET>>>>>>>>>;
-template <typename SUBNET> using rcon5  = dlib::relu<dlib::affine<con5<45,SUBNET>>>;
+template <typename SUBNET>
+using downsampler = dlib::relu<dlib::affine<con5d<32, dlib::relu<dlib::affine<con5d<32, dlib::relu<dlib::affine<con5d<16, SUBNET>>>>>>>>>;
+template <typename SUBNET>
+using rcon5 = dlib::relu<dlib::affine<con5<45, SUBNET>>>;
 
-using net_type = dlib::loss_mmod<dlib::con<1,9,9,1,1,rcon5<rcon5<rcon5<downsampler<dlib::input_rgb_image_pyramid<dlib::pyramid_down<6>>>>>>>>;
+using net_type = dlib::loss_mmod<dlib::con<1, 9, 9, 1, 1, rcon5<rcon5<rcon5<downsampler<dlib::input_rgb_image_pyramid<dlib::pyramid_down<6>>>>>>>>;
 
 #define MAX_QUEUE_SIZE 1
 
@@ -31,12 +35,12 @@ private:
 
 	// Initialize detection routines
 	void InitOpenCV();
-	void InitDNN();	
+	void InitDNN();
 	void InitHog();
 	void InitMod();
 
 private:
-// Properties
+	// Properties
 
 	// Detect faces
 	cv::dnn::Net _networkFace;
@@ -48,7 +52,11 @@ private:
 	// Detection method
 	enum DetectMethods
 	{
-		none, OpenCV, Dnn, Hog, Mod
+		none,
+		OpenCV,
+		Dnn,
+		Hog,
+		Mod
 	};
 
 	// Current selected AI method
@@ -59,10 +67,15 @@ private:
 	bool _addRectToFace;
 	std::mutex _addRectToFaceLock;
 
-	// Queue of cv::Mat images to run detection on 
+	// Queue of cv::Mat images to run detection on
 	std::vector<cv::Mat> _imageQueue;
 	std::mutex _imageQueueLock;
 
+	// Images processed per second
+	int _imagesPerSecond;
+	std::mutex _imagesPerSecondLock;
+
+	// Wait for this signal if image queue is empty
 	std::condition_variable _imageQueueWait;
 	std::mutex _imageQueueWaitLock;
 
@@ -76,40 +89,44 @@ private:
 	// Callback method to pass detected face images to
 	std::function<void(cv::Mat)> _detectedCallback;
 
-// Methods
+	// Methods
 
 	// Look for a face in image
-	bool DetectFaceOpenCV(cv::Mat& image, bool addRectToFace, std::wstring& error);
-	bool DetectFaceDNN(cv::Mat& image, bool addRectToFace, std::wstring& error);
-	bool DetectFaceDlibHog(cv::Mat& image, bool addRectToFace, std::wstring &error);
+	bool DetectFaceOpenCV(cv::Mat &image, bool addRectToFace, std::wstring &error);
+	bool DetectFaceDNN(cv::Mat &image, bool addRectToFace, std::wstring &error);
+	bool DetectFaceDlibHog(cv::Mat &image, bool addRectToFace, std::wstring &error);
 	// Can be hardware accelerated, fastest on Pi4
-	bool DetectFaceDlibMod(cv::Mat& image, bool addRectToFace, std::wstring &error);	
+	bool DetectFaceDlibMod(cv::Mat &image, bool addRectToFace, std::wstring &error);
 
 public:
-// Methods
-	static CDetectFaces& Instance()
+	// Methods
+	static CDetectFaces &Instance()
 	{
 		static CDetectFaces instance;
 		return instance;
 	}
-	
+
 	// Set initial settings
-	bool Initialize(std::string method, std::function<void(cv::Mat)> callback, std::wstring& error);
+	bool Initialize(std::string method, std::function<void(cv::Mat)> callback, std::wstring &error);
 
 	// Stop face detection thread
-	bool Stop(std::wstring& error);
+	bool Stop(std::wstring &error);
 
 	// Get set for _detectMethod
-	void GetDetectMethod(DetectMethods& value);
+	void GetDetectMethod(DetectMethods &value);
 	void SetDetectMethod(DetectMethods value);
 
 	// Get set for _addRectToFace
-	void GetAddRectToFace(bool& value);
+	void GetAddRectToFace(bool &value);
 	void SetAddRectToFace(bool value);
 
 	// Get set for _exitingFlag
-	void GetExitingFlag(bool& value);
+	void GetExitingFlag(bool &value);
 	void SetExitingFlag(bool value);
+
+	// Get set for _imagesPerSecond
+	void GetImagesPerSecond(int &value);
+	void SetImagesPerSecond(int value);
 
 	// Return face detect AI method as string
 	std::string GetDetectMethod();
@@ -118,5 +135,5 @@ public:
 	bool AddImageToQueue(cv::Mat image);
 
 	// Look for a face in image on separate thread
-	static void DetectFacesThread(CDetectFaces* pThis);
+	static void DetectFacesThread(CDetectFaces *pThis);
 };

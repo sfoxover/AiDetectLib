@@ -16,6 +16,7 @@ CDetectFaces::CDetectFaces()
 	SetDetectMethod(none);
 	SetExitingFlag(false);
 	_addRectToFace = true;
+	_imagesPerSecond = 0;
 }
 
 CDetectFaces::~CDetectFaces()
@@ -142,6 +143,21 @@ void CDetectFaces::SetExitingFlag(bool value)
 	_exitingFlagLock.unlock();
 }
 
+// Get set for _imagesPerSecond
+void CDetectFaces::GetImagesPerSecond(int &value)
+{
+	_imagesPerSecondLock.lock();
+	value = _imagesPerSecond;
+	_imagesPerSecondLock.unlock();
+}
+
+void CDetectFaces::SetImagesPerSecond(int value)
+{
+	_imagesPerSecondLock.lock();
+	_imagesPerSecond = value;
+	_imagesPerSecondLock.unlock();
+}
+
 // Return face detect AI method as string
 std::string CDetectFaces::GetDetectMethod()
 {
@@ -218,7 +234,7 @@ bool CDetectFaces::AddImageToQueue(cv::Mat image)
 		imageQueued = true;
 		_imageQueueWait.notify_all();
 	}
-	_imageQueueLock.unlock();	
+	_imageQueueLock.unlock();
 
 	return imageQueued;
 }
@@ -226,9 +242,11 @@ bool CDetectFaces::AddImageToQueue(cv::Mat image)
 void CDetectFaces::DetectFacesThread(CDetectFaces *pThis)
 {
 	bool exiting = false;
+	int imagesProcessed = 0;
+	auto start = std::chrono::system_clock::now();
 	do
 	{
-		bool hasImage = false;		
+		bool hasImage = false;
 		pThis->GetExitingFlag(exiting);
 		if (!exiting)
 		{
@@ -239,7 +257,7 @@ void CDetectFaces::DetectFacesThread(CDetectFaces *pThis)
 			if (hasImage)
 			{
 				image = pThis->_imageQueue[0];
-				pThis->_imageQueue.erase(pThis->_imageQueue.begin(), pThis->_imageQueue.begin()+1);
+				pThis->_imageQueue.erase(pThis->_imageQueue.begin(), pThis->_imageQueue.begin() + 1);
 			}
 			pThis->_imageQueueLock.unlock();
 
@@ -273,6 +291,17 @@ void CDetectFaces::DetectFacesThread(CDetectFaces *pThis)
 				{
 					pThis->_detectedCallback(image);
 				}
+				imagesProcessed++;
+
+				// Set processed count every 1 second
+				auto end = std::chrono::system_clock::now();
+				std::chrono::duration<double> secs = end - start;
+				if (secs.count() >= 1)
+				{
+					pThis->SetImagesPerSecond(imagesProcessed);
+					imagesProcessed = 0;
+					start = std::chrono::system_clock::now();
+				}
 			}
 			else
 			{
@@ -280,8 +309,7 @@ void CDetectFaces::DetectFacesThread(CDetectFaces *pThis)
 				pThis->_imageQueueWait.wait(lock);
 			}
 		}
-	} 
-	while (!exiting);
+	} while (!exiting);
 }
 
 // Look for a face in image
