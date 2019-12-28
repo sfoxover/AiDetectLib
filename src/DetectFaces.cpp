@@ -14,6 +14,7 @@
 CDetectFaces::CDetectFaces()
 {
 	SetDetectMethod(none);
+	SetExitingFlag(false);
 	_addRectToFace = true;
 }
 
@@ -63,12 +64,21 @@ bool CDetectFaces::Initialize(std::string method, std::function<void(cv::Mat)> c
 		return false;
 	}
 
-	// Start thread to process images
-	if (method != "Off" && !_detectThread.joinable())
+	// Create image processing thread if needed
+	if (method != "Off")
 	{
-		_signalNewImage = std::make_unique<std::promise<void>>();
-		auto futureObj = _signalNewImage->get_future();
-		_detectThread = std::thread(&CDetectFaces::DetectFacesThread, this, std::move(futureObj));
+		SetExitingFlag(false);
+		if (!_detectThread || !_detectThread->joinable())
+		{
+			_detectThread = std::make_unique<std::thread>(std::thread(&CDetectFaces::DetectFacesThread, this));
+		}
+	}
+	else
+	{
+		// Stop image processing
+		std::wstring error;
+		bool bOK = Stop(error);
+		assert(bOK);
 	}
 
 	return true;
@@ -78,14 +88,12 @@ bool CDetectFaces::Initialize(std::string method, std::function<void(cv::Mat)> c
 bool CDetectFaces::Stop(std::wstring &error)
 {
 	SetExitingFlag(true);
-	if (_signalNewImage)
-	{
-		_signalNewImage->set_value();
-		_signalNewImage.reset(nullptr);
-	}
+	_imageQueueWait.notify_all();
 
-	if (_detectThread.joinable())
-		_detectThread.join();
+	if (_detectThread && _detectThread->joinable())
+	{
+		_detectThread->join();
+	}
 	return true;
 }
 
@@ -201,83 +209,79 @@ void CDetectFaces::InitMod()
 // Add new image to queue
 bool CDetectFaces::AddImageToQueue(cv::Mat image)
 {
-	bool signal = false;
+	bool imageQueued = false;
 	_imageQueueLock.lock();
-	if (_imageQueue.empty())
+	if (_imageQueue.size() <= MAX_QUEUE_SIZE)
 	{
-		cv::Mat imgCopy = image;
-		_imageQueue.push_back(imgCopy);
-		signal = true;
+		cv::Mat imgCopy = image.clone();
+		_imageQueue.push_back(image);
+		imageQueued = true;
+		_imageQueueWait.notify_all();
 	}
-	_imageQueueLock.unlock();
+	_imageQueueLock.unlock();	
 
-	// Signal new image available
-	if (signal && _signalNewImage)
-	{
-		_signalNewImage->set_value();
-		_signalNewImage.reset(nullptr);
-	}
-	return signal;
+	return imageQueued;
 }
 
-void CDetectFaces::DetectFacesThread(CDetectFaces *pThis, std::future<void> futureObj)
+void CDetectFaces::DetectFacesThread(CDetectFaces *pThis)
 {
 	bool exiting = false;
 	do
 	{
-		futureObj.wait();
-		bool hasImage;
-		do
+		bool hasImage = false;		
+		pThis->GetExitingFlag(exiting);
+		if (!exiting)
 		{
-			hasImage = false;
-			pThis->GetExitingFlag(exiting);
-			if (!exiting)
+			// Load image from front of queue
+			cv::Mat image;
+			pThis->_imageQueueLock.lock();
+			hasImage = !pThis->_imageQueue.empty();
+			if (hasImage)
 			{
-				// Load image from front of queue
-				cv::Mat image;
-				pThis->_imageQueueLock.lock();
-				hasImage = !pThis->_imageQueue.empty();
-				if (hasImage)
-				{
-					image = pThis->_imageQueue[0];
-					pThis->_imageQueue.erase(pThis->_imageQueue.begin());
-				}
-				pThis->_imageQueueLock.unlock();
+				image = pThis->_imageQueue[0];
+				pThis->_imageQueue.erase(pThis->_imageQueue.begin(), pThis->_imageQueue.begin()+1);
+			}
+			pThis->_imageQueueLock.unlock();
 
-				if (hasImage)
+			if (hasImage)
+			{
+				std::wstring error;
+				DetectMethods method;
+				pThis->GetDetectMethod(method);
+				bool addRectToImage;
+				pThis->GetAddRectToFace(addRectToImage);
+				bool bFoundFace = false;
+				switch (method)
 				{
-					std::wstring error;
-					DetectMethods method;
-					pThis->GetDetectMethod(method);
-					bool addRectToImage;
-					pThis->GetAddRectToFace(addRectToImage);
-					bool bFoundFace = false;
-					switch (method)
-					{
-					case OpenCV:
-						bFoundFace = pThis->DetectFaceOpenCV(image, addRectToImage, error);
-						break;
-					case Dnn:
-						bFoundFace = pThis->DetectFaceDNN(image, addRectToImage, error);
-						break;
-					case Hog:
-						bFoundFace = pThis->DetectFaceDlibHog(image, addRectToImage, error);
-						break;
-					case Mod:
-						bFoundFace = pThis->DetectFaceDlibMod(image, addRectToImage, error);
-						break;
-					default:
-						std::cerr << "DetectFaces unsupported method, " << method << std::endl;
-						break;
-					}
-					if (bFoundFace)
-					{
-						pThis->_detectedCallback(image);
-					}
+				case OpenCV:
+					bFoundFace = pThis->DetectFaceOpenCV(image, addRectToImage, error);
+					break;
+				case Dnn:
+					bFoundFace = pThis->DetectFaceDNN(image, addRectToImage, error);
+					break;
+				case Hog:
+					bFoundFace = pThis->DetectFaceDlibHog(image, addRectToImage, error);
+					break;
+				case Mod:
+					bFoundFace = pThis->DetectFaceDlibMod(image, addRectToImage, error);
+					break;
+				default:
+					std::cerr << "DetectFaces unsupported method, " << method << std::endl;
+					break;
+				}
+				if (bFoundFace)
+				{
+					pThis->_detectedCallback(image);
 				}
 			}
-		} while (hasImage);
-	} while (!exiting);
+			else
+			{
+				std::unique_lock<std::mutex> lock(pThis->_imageQueueWaitLock);
+				pThis->_imageQueueWait.wait(lock);
+			}
+		}
+	} 
+	while (!exiting);
 }
 
 // Look for a face in image

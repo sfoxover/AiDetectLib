@@ -21,6 +21,8 @@ template <typename SUBNET> using rcon5  = dlib::relu<dlib::affine<con5<45,SUBNET
 
 using net_type = dlib::loss_mmod<dlib::con<1,9,9,1,1,rcon5<rcon5<rcon5<downsampler<dlib::input_rgb_image_pyramid<dlib::pyramid_down<6>>>>>>>>;
 
+#define MAX_QUEUE_SIZE 1
+
 class CDetectFaces
 {
 private:
@@ -61,18 +63,18 @@ private:
 	std::vector<cv::Mat> _imageQueue;
 	std::mutex _imageQueueLock;
 
+	std::condition_variable _imageQueueWait;
+	std::mutex _imageQueueWaitLock;
+
 	// Exit thread flag
 	bool _exitingFlag;
 	std::mutex _exitingFlagLock;
 
 	// Detect face thread
-	std::thread _detectThread;
+	std::unique_ptr<std::thread> _detectThread;
 
 	// Callback method to pass detected face images to
 	std::function<void(cv::Mat)> _detectedCallback;
-
-	// Signal when new image is ready to be processed
-	std::unique_ptr<std::promise<void>> _signalNewImage;
 
 // Methods
 
@@ -116,5 +118,5 @@ public:
 	bool AddImageToQueue(cv::Mat image);
 
 	// Look for a face in image on separate thread
-	static void DetectFacesThread(CDetectFaces* pThis, std::future<void> futureObj);
+	static void DetectFacesThread(CDetectFaces* pThis);
 };
