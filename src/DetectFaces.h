@@ -1,29 +1,12 @@
 #pragma once
 /*
-	Scan a frame with OpenCV for faces and detection
+	CDetectFaces - Scan an OpenCV Mat frame with DetectFace implementation and draw rectangles around faces detected.
 */
-
+#include "IDetectFace.h"
 #include <mutex>
 #include <condition_variable>
-
-#include <opencv2/opencv.hpp>
+#include <functional>
 #include <dlib/opencv.h>
-#include <dlib/image_processing.h>
-#include <dlib/image_processing/frontal_face_detector.h>
-#include <dlib/dnn.h>
-#include <dlib/data_io.h>
-
-template <long num_filters, typename SUBNET>
-using con5d = dlib::con<num_filters, 5, 5, 2, 2, SUBNET>;
-template <long num_filters, typename SUBNET>
-using con5 = dlib::con<num_filters, 5, 5, 1, 1, SUBNET>;
-
-template <typename SUBNET>
-using downsampler = dlib::relu<dlib::affine<con5d<32, dlib::relu<dlib::affine<con5d<32, dlib::relu<dlib::affine<con5d<16, SUBNET>>>>>>>>>;
-template <typename SUBNET>
-using rcon5 = dlib::relu<dlib::affine<con5<45, SUBNET>>>;
-
-using net_type = dlib::loss_mmod<dlib::con<1, 9, 9, 1, 1, rcon5<rcon5<rcon5<downsampler<dlib::input_rgb_image_pyramid<dlib::pyramid_down<6>>>>>>>>;
 
 #define MAX_QUEUE_SIZE 1
 
@@ -33,34 +16,11 @@ private:
 	CDetectFaces();
 	~CDetectFaces();
 
-	// Initialize detection routines
-	void InitOpenCV();
-	void InitDNN();
-	void InitHog();
-	void InitMod();
-
 private:
-	// Properties
-
-	// Detect faces
-	cv::dnn::Net _networkFace;
-	cv::CascadeClassifier _faceFront;
-	cv::CascadeClassifier _faceProfile;
-	dlib::frontal_face_detector _hogFaceDetector;
-	net_type _mmodFaceDetector;
-
-	// Detection method
-	enum DetectMethods
-	{
-		none,
-		OpenCV,
-		Dnn,
-		Hog,
-		Mod
-	};
+// Properties
 
 	// Current selected AI method
-	DetectMethods _detectMethod;
+	std::string _detectMethod;
 	std::mutex _detectMethodLock;
 
 	// Flag to add rectangle to image around detected face
@@ -89,17 +49,8 @@ private:
 	// Callback method to pass detected face images to
 	std::function<void(cv::Mat)> _detectedCallback;
 
-	// Methods
-
-	// Look for a face in image
-	bool DetectFaceOpenCV(cv::Mat &image, bool addRectToFace, std::wstring &error);
-	bool DetectFaceDNN(cv::Mat &image, bool addRectToFace, std::wstring &error);
-	bool DetectFaceDlibHog(cv::Mat &image, bool addRectToFace, std::wstring &error);
-	// Can be hardware accelerated, fastest on Pi4
-	bool DetectFaceDlibMod(cv::Mat &image, bool addRectToFace, std::wstring &error);
-
 public:
-	// Methods
+// Methods
 	static CDetectFaces &Instance()
 	{
 		static CDetectFaces instance;
@@ -107,14 +58,14 @@ public:
 	}
 
 	// Set initial settings
-	bool Initialize(std::string method, std::function<void(cv::Mat)> callback, std::wstring &error);
+	bool Start(std::string method, std::function<void(cv::Mat)> callback, std::wstring &error);
 
 	// Stop face detection thread
 	bool Stop(std::wstring &error);
 
 	// Get set for _detectMethod
-	void GetDetectMethod(DetectMethods &value);
-	void SetDetectMethod(DetectMethods value);
+	void GetDetectMethod(std::string&value);
+	void SetDetectMethod(std::string value);
 
 	// Get set for _addRectToFace
 	void GetAddRectToFace(bool &value);
@@ -127,9 +78,6 @@ public:
 	// Get set for _imagesPerSecond
 	void GetImagesPerSecond(int &value);
 	void SetImagesPerSecond(int value);
-
-	// Return face detect AI method as string
-	std::string GetDetectMethod();
 
 	// Add new image to queue
 	bool AddImageToQueue(cv::Mat image);
