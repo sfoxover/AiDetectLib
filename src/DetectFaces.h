@@ -4,6 +4,7 @@
 */
 #include "IDetectFace.h"
 #include <mutex>
+#include <thread>
 #include <condition_variable>
 #include <functional>
 #include <dlib/opencv.h>
