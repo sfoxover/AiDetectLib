@@ -17,7 +17,7 @@ public:
 	// Return enum for this AI detect method
 	DetectMethods GetMethod()
 	{
-		return DetectMethods::Hog;
+		return IDetectFace::DetectMethods::Hog;
 	}
 
 	// Set initial settings

@@ -4,8 +4,6 @@
 */
 #include "IDetectFace.h"
 #include <dlib/opencv.h>
-#include <dlib/image_processing.h>
-#include <dlib/image_processing/frontal_face_detector.h>
 #include <dlib/dnn.h>
 #include <dlib/data_io.h>
 

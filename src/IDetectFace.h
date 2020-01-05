@@ -10,7 +10,7 @@ class IDetectFace
 public:
 
 	// Detection method
-	enum DetectMethods
+	enum class DetectMethods 
 	{
 		none,
 		OpenCV,

@@ -16,7 +16,7 @@ public:
 	// Return enum for this AI detect method
 	DetectMethods GetMethod()
 	{
-		return DetectMethods::OpenCV;
+		return IDetectFace::DetectMethods::OpenCV;
 	}
 
 	// Set initial settings
