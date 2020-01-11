@@ -29,7 +29,7 @@ This library is used as follows to detect faces and add a rectange around the fa
 // Initialize facial detection. Supported methods are OpenCV, Dnn, Hog, Mod and none
 if (CSettings::Instance().GetUseFaceDetect())
 {
-  bOK = CDetectFaces::Instance().Start(CSettings::Instance().GetFaceDetectMethod(), &CVideoSource::PublishDetectedFaces, error);
+  	bOK = CDetectFaces::Instance().Start(CSettings::Instance().GetFaceDetectMethod(), &CVideoSource::PublishDetectedFaces, error);
 	assert(bOK);
 }
 ```
@@ -40,13 +40,13 @@ cv::Mat image;
 pThis->_opencvCaputure.read(image);
 if (!image.empty())
 {
-  frameCount++;
-  // Do face detection
+  	frameCount++;
+  	// Do face detection
 	if (CSettings::Instance().GetUseFaceDetect())
 	{
-	  if (SKIP_FRAME_NUM == 0 || (frameCount % SKIP_FRAME_NUM) == 0)
+	  	if (SKIP_FRAME_NUM == 0 || (frameCount % SKIP_FRAME_NUM) == 0)
 		{
-		  CDetectFaces::Instance().AddImageToQueue(image);
+		  	CDetectFaces::Instance().AddImageToQueue(image);
 		}
 	}
 }
